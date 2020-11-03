@@ -4,12 +4,29 @@ plugins {
 
 group 'me.jacobtread.tells'
 version '1.0.0'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 repositories {
     mavenCentral()
 }
 
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'me.jacobtread.tells.Main'
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }{
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+}
+
 dependencies {
-    // https://mvnrepository.com/artifact/org.seleniumhq.selenium/selenium-java
     compile group: 'org.seleniumhq.selenium', name: 'selenium-java', version: '3.141.59'
+    compile group: 'net.sf.jopt-simple', name: 'jopt-simple', version: '5.0.4'
+    compile group: 'net.lightbody.bmp', name: 'browsermob-core', version: '2.1.5'
 }
