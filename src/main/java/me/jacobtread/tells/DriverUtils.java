@@ -48,6 +48,13 @@ public class DriverUtils {
         }
     }
 
+    /**
+     * Copies a file from the input stream and marks it as executable
+     *
+     * @param inputStream The input stream to extract from
+     * @param driverPath The path to extract to
+     * @return Whether or not the driver was extracted
+     */
     private static boolean extractDriver(InputStream inputStream, Path driverPath) {
         if (inputStream == null) {
             LOGGER.severe("Unable to extract driver, Internal file missing. Re-download bot.");

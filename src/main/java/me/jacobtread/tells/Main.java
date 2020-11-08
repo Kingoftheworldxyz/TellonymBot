@@ -3,7 +3,9 @@ package me.jacobtread.tells;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import me.jacobtread.tells.suppliers.FileMessageSupplier;
+import me.jacobtread.tells.supplier.MessageSupplier;
+import me.jacobtread.tells.supplier.suppliers.FileMessageSupplier;
+import me.jacobtread.tells.supplier.suppliers.SingleMessageSupplier;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,23 +13,14 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.function.Supplier;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Main {
 
     public static void main(String[] args) {
-        System.out.printf("" +
-                " _______         __ __                                               \n" +
-                "|_     _|.-----.|  |  |.-----.-----.--.--.--------.  .--------.-----.\n" +
-                "  |   |  |  -__||  |  ||  _  |     |  |  |        |__|        |  -__|\n" +
-                "  |___|  |_____||__|__||_____|__|__|___  |__|__|__|__|__|__|__|_____|\n" +
-                "                                   |_____|                           \n" +
-                " ______         __                                                   \n" +
-                "|   __ \\.-----.|  |_                                                 \n" +
-                "|   __ <|  _  ||   _|     Version: %s                                 \n" +
-                "|______/|_____||____|     Use '--help' for arguments and descriptions\n\n", TellConstants.VERSION);
+        Logger logger = TellonymBot.LOGGER;
         OptionParser optionParser = new OptionParser();
         OptionSpec<?> helpOption = optionParser.acceptsAll(Arrays.asList("h", "help"), "Displays the help message").forHelp();
 
@@ -58,74 +51,73 @@ public class Main {
                 .withRequiredArg()
                 .ofType(String.class);
         OptionSet optionSet = optionParser.parse(args);
-        if(optionSet.has(helpOption)) {
+        if (optionSet.has(quietOption)) {
+            TellonymBot.DISABLE_LOGGING = true;
+        }
+        logger.finest(String.format("" +
+                " _______         __ __                                               \n" +
+                "|_     _|.-----.|  |  |.-----.-----.--.--.--------.  .--------.-----.\n" +
+                "  |   |  |  -__||  |  ||  _  |     |  |  |        |__|        |  -__|\n" +
+                "  |___|  |_____||__|__||_____|__|__|___  |__|__|__|__|__|__|__|_____|\n" +
+                "                                   |_____|                           \n" +
+                " ______         __                                                   \n" +
+                "|   __ \\.-----.|  |_                                                 \n" +
+                "|   __ <|  _  ||   _|     Version: %s                                 \n" +
+                "|______/|_____||____|     Use '--help' for arguments and descriptions\n\n", TellConstants.VERSION));
+        if (optionSet.has(helpOption)) {
             try {
                 optionParser.printHelpOn(System.out);
             } catch (IOException ignored) {
             }
             return;
         }
-        if(optionSet.has(quietOption)) {
-            TellonymBot.DISABLE_LOGGING = true;
-        }
         if (optionSet.has(logOption)) {
             File logPath = logOption.value(optionSet);
             try {
-                TellonymBot.LOGGER.addHandler(new FileHandler(logPath.getAbsolutePath()));
+                logger.addHandler(new FileHandler(logPath.getAbsolutePath()));
             } catch (IOException e) {
-                TellonymBot.LOGGER.log(Level.WARNING, "Unable to add file logger continuing anyway", e);
+                logger.log(Level.WARNING, "Unable to add file logger continuing anyway", e);
             }
         }
         String username = usernameOption.value(optionSet);
         boolean head = optionSet.has(headOption);
         int max = maxOption.value(optionSet);
-        Supplier<String> messages;
+        MessageSupplier messages;
         if (optionSet.has(fileOption)) {
             Path file = fileOption.value(optionSet).toPath();
             if (!Files.exists(file)) {
-                TellonymBot.LOGGER.severe("");
+                logger.severe("");
             }
             boolean random = optionSet.has(randomOption);
             FileMessageSupplier supplier = new FileMessageSupplier(file, max, random);
-            TellonymBot.LOGGER.info("Loading messages");
+            logger.info("Loading messages");
             try {
                 supplier.load();
             } catch (IOException e) {
-                TellonymBot.LOGGER.log(Level.SEVERE, "Unable to load messages file", e);
+                logger.log(Level.SEVERE, "Unable to load messages file", e);
                 return;
             }
-            if (supplier.isEmpty()) {
-                TellonymBot.LOGGER.severe("Messages file was empty!");
+            if (supplier.hasMore()) {
+                logger.severe("File did not contain any messages??");
                 return;
             }
             messages = supplier;
         } else {
             String message = messageOption.value(optionSet);
-            messages = new Supplier<String>() {
-                int count = 0;
-
-                @Override
-                public String get() {
-                    if (count < max) {
-                        count++;
-                        return message;
-                    }
-                    return null;
-                }
-            };
+            messages = new SingleMessageSupplier(message, max);
         }
-        if(optionSet.has(proxyOption)) {
+        if (optionSet.has(proxyOption)) {
             String proxy = proxyOption.value(optionSet);
             String[] parts = proxy.split(":");
-            if(parts.length > 1) {
+            if (parts.length > 1) {
                 try {
                     InetSocketAddress address = InetSocketAddress.createUnresolved(parts[0], Integer.parseInt(parts[1]));
-                    TellonymBot.PROXY.setChainedProxy(address);
-                }catch (NumberFormatException e) {
-                    TellonymBot.LOGGER.log(Level.SEVERE, "Unable to get port from proxy string invalid int");
+                    ProxyController.setChainedProxy(address);
+                } catch (NumberFormatException e) {
+                    logger.log(Level.SEVERE, "Unable to get port from proxy string invalid int");
                 }
             } else {
-                TellonymBot.LOGGER.severe("Proxy missing port!");
+                logger.severe("Proxy missing port!");
             }
         }
         TellonymBot bot = new TellonymBot(username, !head, messages);

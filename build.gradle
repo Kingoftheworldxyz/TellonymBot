@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'me.jacobtread.tells'
-version '1.0.0'
+version '1.1.0'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
@@ -29,4 +29,5 @@ dependencies {
     compile group: 'org.seleniumhq.selenium', name: 'selenium-java', version: '3.141.59'
     compile group: 'net.sf.jopt-simple', name: 'jopt-simple', version: '5.0.4'
     compile group: 'net.lightbody.bmp', name: 'browsermob-core', version: '2.1.5'
+    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
 }

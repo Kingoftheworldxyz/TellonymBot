@@ -12,14 +12,6 @@
 Yeah the name pretty much says it all. It's a spam bot for the website [Tellonym.me](https://tellonym.me)
 you can run it in the command line or use it as a library. It runs using [Selenium](https://www.selenium.dev/) and the FireFox [Gecko Driver](https://github.com/mozilla/geckodriver)
 
-##Library
-###Creating a bot
-Yeah.. its pretty simple for a single message you can use SingleMessageSupplier
-```java
-TellonymBot bot = new TellonymBot("theUsername",  new FileMessageSupplier(Paths.get("/path/to/your/file")));
-bot.run();
-```
-
 ## Command line
 ### Arguments:
 \* = Required
@@ -36,5 +28,51 @@ bot.run();
 | proxy     | -p, --proxy    | A second layer proxy to get around being blocked by the user (host:port) |
 | quiet     | -q, --quiet    | Disable program logging                                                  |
 | head      | -h, --head     | Run with the head of the browser window (Just dont...)                   |
+
+## Library
+### Running 
+```java
+String account = "example"
+TellonymBot bot = new TellonymBot(account, /*Your supplier*/messageSupplier);
+bot.run();
+```
+### Suppliers
+
+File:
+```java
+Path file = Paths.get("path/to/your/file");
+FileMessageSupplier messageSupplier = new FileMessageSupplier(file);
+messageSupplier.load();
+```
+Stream:
+```java
+InputStream resourceStream = Test.class.getResourceAsStream("/messages.txt");
+StreamMessageSupplier messageSupplier = new StreamMessageSupplier(resourceStream);
+messageSupplier.load();
+```
+List:
+```java
+List<String> examples = Arrays.asList("This is an example tell.", "Hey how are you doing?", "Bingo Bongo this is a Bot.");
+ListMessageSupplier messageSupplier = new ListMessageSupplier(examples);
+```
+Text:
+```java
+String message = "This is an example tell.";
+SingleMessageSupplier messageSupplier = new SingleMessageSupplier(message);
+```
+Custom:
+```java
+MessageSupplier messageSupplier = new MessageSupplier() {
+    @Override
+    public boolean hasMore() {
+        return true; // TODO: Return false to indicate no more messages
+    }
+
+    @Override
+    public String next() {
+        return ""; // TODO: Return the message to send
+    }
+};
+```
 
 By Jacobtread yay

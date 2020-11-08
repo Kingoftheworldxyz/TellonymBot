@@ -1,0 +1,6 @@
+This is an example tell message!
+Hey how are you doing?
+Bingo Bongo this is a Bot.
+What is your favourite day of the week?
+What is something that you miss?
+What is you deepest fear?

@@ -1,9 +1,6 @@
 package me.jacobtread.tells;
 
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
-import net.lightbody.bmp.BrowserMobProxyServer;
+import me.jacobtread.tells.supplier.MessageSupplier;
 import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -13,7 +10,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 import static me.jacobtread.tells.TellConstants.*;
@@ -22,28 +18,8 @@ public class TellonymBot {
 
     public static final Logger LOGGER = Logger.getLogger("TellonymBot");
     public static boolean DISABLE_LOGGING = false;
-    public static BrowserMobProxyServer PROXY;
 
     static {
-        PROXY = new BrowserMobProxyServer();
-        PROXY.addRequestFilter((request, contents, messageInfo) -> {
-            String url = messageInfo.getUrl();
-            if (
-                    url.contains("c.amazon-adsystem.com")
-                            || url.contains("securepubads.g.doubleclick.net")
-                            || url.endsWith(".css")
-                            || url.endsWith(".png")
-                            || url.endsWith(".jpg")
-                            || url.contains("apex.go.sonobi.com")
-                            || url.contains("ads.pubmatic.com")
-                            || url.contains("facebook.com")
-                            || url.contains("google-analytics")
-            ) {
-                return new DefaultFullHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.NOT_FOUND);
-            }
-            return null;
-        });
-        PROXY.start(0);
         LOGGER.setUseParentHandlers(false);
         LOGGER.addHandler(new LogHandler());
         Path driverPath = DriverUtils.getDriver(false);
@@ -58,28 +34,33 @@ public class TellonymBot {
     private final boolean isHeadless;
     private final String accountUrl;
     private WebDriverWait waitTime;
-    private Supplier<String> messages;
+    private MessageSupplier messages;
     private WebDriver driver;
     private boolean isRunning;
 
-    public TellonymBot(String username, Supplier<String> messages) {
+    public TellonymBot(String username, MessageSupplier messages) {
         this(username, true, messages);
     }
 
-    public TellonymBot(String username, boolean isHeadless, Supplier<String> messages) {
+    /**
+     * @param username The username of the account to send the message to
+     * @param isHeadless Setting to false will display the firefox window while attacking
+     * @param messages The message supplier
+     */
+    public TellonymBot(String username, boolean isHeadless, MessageSupplier messages) {
         this.username = username;
         this.isHeadless = isHeadless;
         this.messages = messages;
         accountUrl = String.format(ACCOUNT_URL, username);
     }
 
+    /**
+     * Creates the driver instance and attaches proxy
+     */
     public void load() {
         LOGGER.info("Creating driver instance");
         FirefoxOptions options = new FirefoxOptions();
-        Proxy proxy = new Proxy();
-        proxy.setHttpProxy("localhost:" + PROXY.getPort());
-        proxy.setSslProxy("localhost:" + PROXY.getPort());
-        options.setProxy(proxy);
+        options.setProxy(ProxyController.getSeleniumProxy());
         options.setHeadless(isHeadless);
         driver = new FirefoxDriver(options);
         waitTime = new WebDriverWait(driver, WAIT_TIME);
@@ -87,20 +68,24 @@ public class TellonymBot {
         Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
+    /**
+     * Starts the spam
+     */
     public void run() {
         LOGGER.info(String.format("== Starting Bot [username=%s] [headless=%b] ==", username, isHeadless));
         load();
-        boolean exists = checkUserExists();
+        boolean exists = isExistingAccount();
         if (exists) {
             LOGGER.info("Found user " + username);
             isRunning = true;
             int attempt = 0;
             while (isRunning) {
-                String message = messages.get();
-                if (message == null) {
-                    isRunning = false;
+                if (!messages.hasMore()) {
+                    LOGGER.info("Completed. Sent all messages");
                     break;
-                } else if (message.length() < 4) {
+                }
+                String message = messages.next();
+                if (message.length() < 4) {
                     LOGGER.warning("\nMessage too short minimum 4 chars");
                 } else if (message.length() > 15000) {
                     LOGGER.warning("\nMessage too large maximum 15k chars");
@@ -117,16 +102,19 @@ public class TellonymBot {
         }
     }
 
+    /**
+     * Stops the bot and shuts down the proxy server;
+     */
     public void stop() {
         isRunning = false;
         driver.quit();
-        try {
-            PROXY.abort();
-        } catch (Exception ignored) {
-
-        }
     }
 
+    /**
+     * Sends the message to tellonym.me
+     *
+     * @param message The message to send
+     */
     private void send(String message) {
         if (!driver.getCurrentUrl().equals(accountUrl)) {
             driver.get(accountUrl);
@@ -150,7 +138,13 @@ public class TellonymBot {
         }
     }
 
-    public boolean checkUserExists() {
+    /**
+     * Loads the account url to check if the account actually exists
+     * (If the account does not exist the bot is redirected to the base url)
+     *
+     * @return Whether or not the provided account exists
+     */
+    public boolean isExistingAccount() {
         driver.get(accountUrl);
         waitLoaded();
         AtomicBoolean isInvalid = new AtomicBoolean(false);
@@ -164,10 +158,19 @@ public class TellonymBot {
         return !isInvalid.get();
     }
 
+    /**
+     * Waits until the specific element is on the page
+     *
+     * @param by The element to wait for
+     */
     private void waitTillPresent(By by) {
         waitTime.until(webDriver -> webDriver.findElements(by).size() > 0);
     }
 
+    /**
+     * Waits until the page is fully loaded
+     * (Uses JS to request document.readyState and completes
+     */
     private void waitLoaded() {
         waitTime.until(webDriver -> ((JavascriptExecutor) webDriver)
                 .executeScript("return document.readyState")
@@ -175,11 +178,14 @@ public class TellonymBot {
         );
     }
 
-    public void setMessages(Supplier<String> messages) {
+    /**
+     * Replace the current messages supplier with a new one
+     *
+     * @param messages The new messages supplier
+     */
+    public void setMessages(MessageSupplier messages) {
         this.messages = messages;
     }
 
-    public String getUsername() {
-        return username;
-    }
+
 }
