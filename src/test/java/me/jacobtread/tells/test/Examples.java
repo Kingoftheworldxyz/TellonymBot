@@ -47,7 +47,7 @@ public class Examples {
     }
 
     public static void textExample() {
-        String account = "jacobtread";
+        String account = "example";
         String message = "This is an example tell.";
         int max = 5;
         SingleMessageSupplier messageSupplier = new SingleMessageSupplier(message, max);
